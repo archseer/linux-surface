@@ -15,15 +15,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-
-      - name: Package Firmware
-        env:
-          GPG_KEY: ${{ secrets.GITHUB_GPG_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GITHUB_GPG_PASSPHRASE }}
+      
+      - name: Install dependencies
         run: |
-          # get dependencies
           sudo apt-get install -y build-essential debhelper dpkg-sig
 
+      - name: Build package
+        run: |
           # prepare source
           cp -r firmware pkg/deb/firmware/firmware
 
@@ -32,6 +30,11 @@ jobs:
           dpkg-buildpackage -b -us -uc
           popd
 
+      - name: Sign package
+        env:
+          GPG_KEY: ${{ secrets.GITHUB_GPG_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GITHUB_GPG_PASSPHRASE }}
+        run: |
           # import GPG key
           echo "$GPG_KEY" | base64 -d | gpg --import --no-tty --batch --yes
           export GPG_TTY=$(tty)
@@ -40,7 +43,8 @@ jobs:
           dpkg-sig -g "--batch --no-tty --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE" \
               --sign builder -k 5B574D1B513F9A05 pkg/deb/*.deb
 
-          # move to release
+      - name: Prepare release
+        run: |
           mkdir release
           mv pkg/deb/*.deb release
 
