@@ -2,72 +2,107 @@ on:
   push:
    branches:
       - feature/pkg
+      - feature/pkg-deb
     # tags:
     # - 'v*+'
 
 name: Create release and upload binaries
 
 jobs:
-  build-arch:
-    name: Build Arch Linux
+  build-firmware-deb:
+    name: Build Debian Packages
     runs-on: ubuntu-latest
-    container: archlinux
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Build
+      - name: Package Firmware
         env:
           GPG_KEY: ${{ secrets.GITHUB_GPG_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GITHUB_GPG_PASSPHRASE }}
         run: |
-          pushd pkg/arch
-          # Create user
-          useradd -m -g wheel -s /bin/bash build
-          echo "build ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-          chown -R build:wheel .
-          chown -R build:wheel $HOME
+          # get dependencies
+          sudo apt-get install -y build-essential debhelper
 
-          # Install makepkg deps
-          pacman -Sy sudo binutils fakeroot grep base-devel git --noconfirm
+          # prepare source
+          cp -r firmware pkg/deb/firmware/firmware
 
-          # Build
-          su build --pty -s /bin/bash -c './build.sh'
+          # build package
+          pushd pkg/deb/firmware
+          dpkg-buildpackage -b -us -uc
           popd
+
+          # move to release
           mkdir release
-          mv pkg/arch/**/*.pkg.tar.zst* release
+          mv pkg/deb/*.deb release
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v1
         with:
-          name: arch-latest
+          name: debian-firmware
           path: release
-  release:
-    name: Create and Upload Release
-    needs: [build-arch]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Arch Linux artifacts
-        uses: actions/download-artifact@v1
-        with:
-          name: arch-latest
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          draft: false
-          prerelease: false
 
-      - name: Upload Arch Linux Assets to Release
-        uses: svenstaro/upload-release-action@v1-release
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ./arch-latest/*
-          tag: ${{ github.ref }}
-          overwrite: true
-          file_glob: true
+#  build-arch:
+#    name: Build Arch Linux
+#    runs-on: ubuntu-latest
+#    container: archlinux
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v2
+#
+#      - name: Build
+#        env:
+#          GPG_KEY: ${{ secrets.GITHUB_GPG_KEY }}
+#          GPG_PASSPHRASE: ${{ secrets.GITHUB_GPG_PASSPHRASE }}
+#        run: |
+#          pushd pkg/arch
+#          # Create user
+#          useradd -m -g wheel -s /bin/bash build
+#          echo "build ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+#          chown -R build:wheel .
+#          chown -R build:wheel $HOME
+#
+#          # Install makepkg deps
+#          pacman -Sy sudo binutils fakeroot grep base-devel git --noconfirm
+#
+#          # Build
+#          su build --pty -s /bin/bash -c './build.sh'
+#          popd
+#          mkdir release
+#          mv pkg/arch/**/*.pkg.tar.zst* release
+#
+#      - name: Upload artifacts
+#        uses: actions/upload-artifact@v1
+#        with:
+#          name: arch-latest
+#          path: release
+#  release:
+#    name: Create and Upload Release
+#    needs: [build-arch]
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Download Arch Linux artifacts
+#        uses: actions/download-artifact@v1
+#        with:
+#          name: arch-latest
+#
+#      - name: Create Release
+#        id: create_release
+#        uses: actions/create-release@v1
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        with:
+#          tag_name: ${{ github.ref }}
+#          release_name: ${{ github.ref }}
+#          draft: false
+#          prerelease: false
+#
+#      - name: Upload Arch Linux Assets to Release
+#        uses: svenstaro/upload-release-action@v1-release
+#        with:
+#          repo_token: ${{ secrets.GITHUB_TOKEN }}
+#          file: ./arch-latest/*
+#          tag: ${{ github.ref }}
+#          overwrite: true
+#          file_glob: true
