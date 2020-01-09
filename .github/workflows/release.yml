@@ -10,7 +10,7 @@ name: Create release and upload binaries
 
 jobs:
   build-firmware-deb:
-    name: Build Debian Packages
+    name: Build Debian firmware package
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
