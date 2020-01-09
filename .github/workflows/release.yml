@@ -22,7 +22,7 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.GITHUB_GPG_PASSPHRASE }}
         run: |
           # get dependencies
-          sudo apt-get install -y build-essential debhelper
+          sudo apt-get install -y build-essential debhelper dpkg-sig
 
           # prepare source
           cp -r firmware pkg/deb/firmware/firmware
@@ -31,6 +31,14 @@ jobs:
           pushd pkg/deb/firmware
           dpkg-buildpackage -b -us -uc
           popd
+
+          # import GPG key
+          echo "$GPG_KEY" | base64 -d | gpg --import --no-tty --batch --yes
+          export GPG_TTY=$(tty)
+
+          # sign package
+          dpkg-sig -g "--batch --no-tty --pinentry-mode=loopback --passphrase $GPG_PASSPHRASE" \
+              --sign builder -k 5B574D1B513F9A05 pkg/deb/*.deb
 
           # move to release
           mkdir release
